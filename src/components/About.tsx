@@ -48,7 +48,7 @@ export default function About() {
                 src={avatarImg}
                 alt="Gokul"
                 referrerPolicy="no-referrer"
-                className="profile-img avatar w-full h-full object-cover filter grayscale"
+                className="profile-img avatar w-full h-full object-cover object-top transition-all duration-500 filter grayscale contrast-105 group-hover:grayscale-0"
               />
             </div>
           </div>
