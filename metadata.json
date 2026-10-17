@@ -1,0 +1,6 @@
+{
+  "name": "Minimalist Portfolio Website",
+  "description": "A premium, minimal personal portfolio website featuring glassmorphism cards, interactive mouse-move gradient shifts, smooth scrolling, and elegant typography.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
