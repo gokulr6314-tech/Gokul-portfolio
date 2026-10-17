@@ -38,7 +38,7 @@ export interface Hackathon {
   theme: string;
   projectName: string;
   projectDescription: string;
-  achievement: string;
+  achievement?: string;
   duration: string;
   role: string;
   tech: string[];

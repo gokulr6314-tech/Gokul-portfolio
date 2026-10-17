@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import GlassCard from './GlassCard';
-import { Trophy, Clock, Cpu, Award, Zap, Code2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Trophy, Clock, Award, Zap, Code2 } from 'lucide-react';
 import { Hackathon } from '../types';
 
 const HACKATHONS_DATA: Hackathon[] = [
@@ -18,7 +18,6 @@ const HACKATHONS_DATA: Hackathon[] = [
     theme: 'AgriTech & AI Solutions',
     projectName: 'PasuPhosak',
     projectDescription: 'Architected an automated dietary ration optimizer and cattle nutrition recommendation engine aimed at boosting smallholder dairy yields.',
-    achievement: 'National Finalist',
     duration: '36 Hours Non-Stop',
     role: 'Lead AI & Frontend Developer',
     tech: ['React', 'AgriTech', 'Data Modeling', 'Tailwind CSS']
@@ -31,7 +30,6 @@ const HACKATHONS_DATA: Hackathon[] = [
     theme: 'Generative AI & LLM Workflows',
     projectName: 'Prompt Sandbox',
     projectDescription: 'Designed a real-time reactive playground to structure, parameterize, and stress-test system cues for generative neural models.',
-    achievement: 'Top 10 Innovation Award',
     duration: '24 Hours Sprint',
     role: 'Full Stack AI Engineer',
     tech: ['Gemini API', 'React 19', 'Prompt Ops', 'Tailwind CSS']
@@ -44,7 +42,6 @@ const HACKATHONS_DATA: Hackathon[] = [
     theme: 'FinTech & Merchant Systems',
     projectName: 'Vyapar Mitr',
     projectDescription: 'Built an offline-first GST-ready billing companion and digital khata ledger designed for speed on retail counter desktops.',
-    achievement: '2nd Place / Silver Winner',
     duration: '48 Hours Build',
     role: 'Frontend Architect',
     tech: ['React', 'TypeScript', 'Invoice Engine', 'Analytics']
@@ -57,7 +54,6 @@ const HACKATHONS_DATA: Hackathon[] = [
     theme: 'Smart Transit & Booking',
     projectName: 'Travel ease',
     projectDescription: 'Crafted a zero-friction multimodal transit reservation portal with live seat indexing and instant itinerary dispatch.',
-    achievement: 'Special Innovation Mention',
     duration: '24 Hours Hackathon',
     role: 'Core Frontend Developer',
     tech: ['React', 'Vite', 'Booking Engine', 'Tailwind CSS']
@@ -193,10 +189,6 @@ export default function Hackathons() {
                     <span className="text-[10px] font-mono font-medium uppercase tracking-widest liquid-glass-chip rounded-md py-1 px-2.5 shadow-sm">
                       {hackathon.duration}
                     </span>
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 text-amber-700 rounded-full text-[10px] font-mono font-semibold border border-amber-300/40">
-                      <Sparkles className="w-3 h-3 text-amber-500" />
-                      <span>{hackathon.achievement}</span>
-                    </div>
                   </div>
 
                   {/* Hackathon Name & Organizer */}
