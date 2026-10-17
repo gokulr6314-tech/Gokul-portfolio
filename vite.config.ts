@@ -4,10 +4,10 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
-  return {
-    // Relative base path ensures deployment works seamlessly on GitHub Pages (any repo name),
-    // custom domains, Netlify, Vercel, or local preview without hardcoded subpaths.
-    base: process.env.BASE_PATH || './',
+    const rawBase = process.env.BASE_PATH;
+    const safeBase = rawBase && !rawBase.includes('<') && !rawBase.includes('>') ? rawBase : './';
+    return {
+      base: safeBase,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
