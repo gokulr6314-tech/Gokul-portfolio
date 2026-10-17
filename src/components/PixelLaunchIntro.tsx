@@ -11,6 +11,8 @@ interface PixelLaunchIntroProps {
 }
 
 interface Particle {
+  startX: number;
+  startY: number;
   x: number;
   y: number;
   hx: number;
@@ -19,6 +21,7 @@ interface Particle {
   vy: number;
   c: string;
   delay: number;
+  wanderAngle: number;
 }
 
 export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) {
@@ -66,7 +69,6 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
     const GRID = Math.floor(S / PX);
 
     let parts: Particle[] | null = null;
-    let frames = 0;
     let exploding = false;
 
     // Load Gokul's image
@@ -130,17 +132,22 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
           }
 
           const angle = Math.random() * Math.PI * 2;
-          const radius = S * (0.8 + Math.random() * 0.9);
+          const radius = S * (0.85 + Math.random() * 0.95);
+          const startX = S / 2 + Math.cos(angle) * radius;
+          const startY = S / 2 + Math.sin(angle) * radius;
 
           newParts.push({
-            x: S / 2 + Math.cos(angle) * radius,
-            y: S / 2 + Math.sin(angle) * radius,
+            startX,
+            startY,
+            x: startX,
+            y: startY,
             hx: x * PX + PX / 2,
             hy: y * PX + PX / 2,
             vx: 0,
             vy: 0,
             c: `rgb(${r},${g},${b})`,
-            delay: Math.random() * 35,
+            delay: Math.random() * 700, // staggered start up to 700ms
+            wanderAngle: Math.random() * Math.PI * 2,
           });
         }
       }
@@ -158,16 +165,22 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
             if (a < 80 || (r + g + b) / 3 > 248) continue;
 
             const angle = Math.random() * Math.PI * 2;
-            const radius = S * (0.8 + Math.random() * 0.9);
+            const radius = S * (0.85 + Math.random() * 0.95);
+            const startX = S / 2 + Math.cos(angle) * radius;
+            const startY = S / 2 + Math.sin(angle) * radius;
+
             newParts.push({
-              x: S / 2 + Math.cos(angle) * radius,
-              y: S / 2 + Math.sin(angle) * radius,
+              startX,
+              startY,
+              x: startX,
+              y: startY,
               hx: x * PX + PX / 2,
               hy: y * PX + PX / 2,
               vx: 0,
               vy: 0,
               c: `rgb(${r},${g},${b})`,
-              delay: Math.random() * 35,
+              delay: Math.random() * 700,
+              wanderAngle: Math.random() * Math.PI * 2,
             });
           }
         }
@@ -187,7 +200,12 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
       finishIntro(true);
     };
 
-    const tick = () => {
+    // 4-second total choreography
+    const ASSEMBLY_MS = 2800; // ~2.8s smooth convergence (0% -> 100%)
+    const PAUSE_MS = 400;     // ~0.4s pause showing completed pixel portrait
+    let startTime: number | null = null;
+
+    const tick = (now: number) => {
       if (isTerminatedRef.current) return;
 
       if (!imgLoaded) {
@@ -200,48 +218,77 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
         return;
       }
 
-      ctx.clearRect(0, 0, S, S);
-      frames++;
-      let totalDist = 0;
-
-      for (let i = 0; i < parts.length; i++) {
-        const p = parts[i];
-        if (!exploding && frames > p.delay) {
-          p.vx += (p.hx - p.x) * 0.045;
-          p.vy += (p.hy - p.y) * 0.045;
-          p.vx *= 0.82;
-          p.vy *= 0.82;
-        }
-
-        p.x += p.vx;
-        p.y += p.vy;
-
-        totalDist += Math.abs(p.hx - p.x) + Math.abs(p.hy - p.y);
-        ctx.fillStyle = p.c;
-        ctx.fillRect(p.x - PX / 2, p.y - PX / 2, PX - 1, PX - 1);
+      if (startTime === null) {
+        startTime = now;
       }
 
-      const avg = totalDist / parts.length;
-      const pct = Math.min(100, Math.round(100 * (1 - Math.min(1, avg / 280))));
-      setPercent(pct);
-      setStatusText(`assembling world… ${pct}%`);
+      const elapsed = now - startTime;
+      ctx.clearRect(0, 0, S, S);
 
-      // Once assembled (avg distance small or enough frames passed)
-      if (!exploding && (avg < 2.2 || frames > 230)) {
-        exploding = true;
+      if (elapsed < ASSEMBLY_MS) {
+        // Phase 1 (0 to 2.8s): Smooth Assembly
+        const pct = Math.min(100, Math.floor((elapsed / ASSEMBLY_MS) * 100));
+        setPercent(pct);
+        setStatusText(`assembling world… ${pct}%`);
+
         for (let i = 0; i < parts.length; i++) {
           const p = parts[i];
-          const dx = p.x - S / 2;
-          const dy = p.y - S / 2;
-          const d = Math.hypot(dx, dy) || 1;
-          const f = 6 + Math.random() * 10;
-          p.vx = (dx / d) * f;
-          p.vy = (dy / d) * f - 2;
+          const partElapsed = Math.max(0, elapsed - p.delay);
+          const totalPartTime = Math.max(1, ASSEMBLY_MS - p.delay);
+          const progress = Math.min(1, partElapsed / totalPartTime);
+
+          // Smooth cubic ease-out
+          const ease = 1 - Math.pow(1 - progress, 3);
+          // Gentle floating wander that settles as it approaches target
+          const wander = (1 - ease) * Math.sin(elapsed * 0.005 + p.wanderAngle) * 6;
+
+          p.x = p.startX + (p.hx - p.startX) * ease + wander;
+          p.y = p.startY + (p.hy - p.startY) * ease + wander;
+
+          ctx.fillStyle = p.c;
+          ctx.fillRect(p.x - PX / 2, p.y - PX / 2, PX - 1, PX - 1);
+        }
+      } else if (elapsed < ASSEMBLY_MS + PAUSE_MS) {
+        // Phase 2 (2.8s to 3.2s): Fully Assembled Display
+        setPercent(100);
+        setStatusText('assembling world… 100%');
+
+        for (let i = 0; i < parts.length; i++) {
+          const p = parts[i];
+          p.x = p.hx;
+          p.y = p.hy;
+          ctx.fillStyle = p.c;
+          ctx.fillRect(p.x - PX / 2, p.y - PX / 2, PX - 1, PX - 1);
+        }
+      } else {
+        // Phase 3 (3.2s+): Explosion Burst & Smooth Exit Transition
+        if (!exploding) {
+          exploding = true;
+          setStatusText('entering…');
+          for (let i = 0; i < parts.length; i++) {
+            const p = parts[i];
+            const dx = p.x - S / 2;
+            const dy = p.y - S / 2;
+            const d = Math.hypot(dx, dy) || 1;
+            const speed = 5 + Math.random() * 9;
+            p.vx = (dx / d) * speed;
+            p.vy = (dy / d) * speed - 1.5;
+          }
+
+          // Trigger smooth fade-out
+          setTimeout(() => {
+            finishIntro(false);
+          }, 350);
         }
 
-        setTimeout(() => {
-          finishIntro(false);
-        }, 350);
+        for (let i = 0; i < parts.length; i++) {
+          const p = parts[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.12; // gentle downward gravity
+          ctx.fillStyle = p.c;
+          ctx.fillRect(p.x - PX / 2, p.y - PX / 2, PX - 1, PX - 1);
+        }
       }
 
       animFrameIdRef.current = requestAnimationFrame(tick);
