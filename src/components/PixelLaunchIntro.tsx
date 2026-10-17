@@ -26,6 +26,7 @@ interface Particle {
 
 export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
   const [percent, setPercent] = useState<number>(0);
   const [statusText, setStatusText] = useState<string>('assembling world… 0%');
   const [isExiting, setIsExiting] = useState<boolean>(false);
@@ -64,10 +65,23 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const S = 360;
-    const PX = 8;
-    const GRID = Math.floor(S / PX);
+    // Resize canvas to full window
+    let W = window.innerWidth;
+    let H = window.innerHeight;
+    canvas.width = W;
+    canvas.height = H;
 
+    const handleResize = () => {
+      if (!canvas) return;
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = W;
+      canvas.height = H;
+    };
+    window.addEventListener('resize', handleResize);
+
+    const GRID = 44;
+    let pxSize = 7.5;
     let parts: Particle[] | null = null;
     let exploding = false;
 
@@ -102,7 +116,19 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
       const data = readPixels(loadedImg, GRID);
       if (!data) return false;
 
-      // Sample top-left and top-right corner to detect background color
+      // Get target box coordinates on the screen
+      const boxRect = boxRef.current?.getBoundingClientRect();
+      const targetBoxW = boxRect ? boxRect.width : Math.min(340, W * 0.85);
+      const targetBoxH = boxRect ? boxRect.height : targetBoxW;
+      const targetLeft = boxRect ? boxRect.left : (W - targetBoxW) / 2;
+      const targetTop = boxRect ? boxRect.top : (H - targetBoxH) / 2 - 40;
+
+      pxSize = targetBoxW / GRID;
+
+      const centerX = W / 2;
+      const centerY = H / 2;
+
+      // Sample top corner to detect background
       const iTL = 0;
       const bgR = data[iTL];
       const bgG = data[iTL + 1];
@@ -124,35 +150,39 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
           const brightness = (r + g + b) / 3;
           if (brightness > 245) continue;
 
-          // Check distance to corner background color
+          // Check distance to corner background color near outer edges
           const colorDist = Math.hypot(r - bgR, g - bgG, b - bgB);
           if (colorDist < 28 && (y < GRID * 0.35 || x < GRID * 0.15 || x > GRID * 0.85)) {
-            // Likely background edge
             continue;
           }
 
+          // Target position strictly inside the designated box
+          const hx = targetLeft + x * pxSize + pxSize / 2;
+          const hy = targetTop + y * pxSize + pxSize / 2;
+
+          // Start position spread across the entire screen and beyond screen boundaries
           const angle = Math.random() * Math.PI * 2;
-          const radius = S * (0.85 + Math.random() * 0.95);
-          const startX = S / 2 + Math.cos(angle) * radius;
-          const startY = S / 2 + Math.sin(angle) * radius;
+          const distance = Math.max(W, H) * (0.55 + Math.random() * 0.75);
+          const startX = centerX + Math.cos(angle) * distance;
+          const startY = centerY + Math.sin(angle) * distance;
 
           newParts.push({
             startX,
             startY,
             x: startX,
             y: startY,
-            hx: x * PX + PX / 2,
-            hy: y * PX + PX / 2,
+            hx,
+            hy,
             vx: 0,
             vy: 0,
             c: `rgb(${r},${g},${b})`,
-            delay: Math.random() * 700, // staggered start up to 700ms
+            delay: Math.random() * 750, // staggered start
             wanderAngle: Math.random() * Math.PI * 2,
           });
         }
       }
 
-      // If filtering was overly aggressive, use all non-white pixels
+      // Fallback if filtering was too aggressive
       if (newParts.length < 120) {
         newParts.length = 0;
         for (let y = 0; y < GRID; y++) {
@@ -164,22 +194,25 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
             const a = data[i + 3];
             if (a < 80 || (r + g + b) / 3 > 248) continue;
 
+            const hx = targetLeft + x * pxSize + pxSize / 2;
+            const hy = targetTop + y * pxSize + pxSize / 2;
+
             const angle = Math.random() * Math.PI * 2;
-            const radius = S * (0.85 + Math.random() * 0.95);
-            const startX = S / 2 + Math.cos(angle) * radius;
-            const startY = S / 2 + Math.sin(angle) * radius;
+            const distance = Math.max(W, H) * (0.55 + Math.random() * 0.75);
+            const startX = centerX + Math.cos(angle) * distance;
+            const startY = centerY + Math.sin(angle) * distance;
 
             newParts.push({
               startX,
               startY,
               x: startX,
               y: startY,
-              hx: x * PX + PX / 2,
-              hy: y * PX + PX / 2,
+              hx,
+              hy,
               vx: 0,
               vy: 0,
               c: `rgb(${r},${g},${b})`,
-              delay: Math.random() * 700,
+              delay: Math.random() * 750,
               wanderAngle: Math.random() * Math.PI * 2,
             });
           }
@@ -196,13 +229,12 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
       buildParticles(img);
     };
     img.onerror = () => {
-      // If photo fails, skip intro safely
       finishIntro(true);
     };
 
     // 4-second total choreography
-    const ASSEMBLY_MS = 2800; // ~2.8s smooth convergence (0% -> 100%)
-    const PAUSE_MS = 400;     // ~0.4s pause showing completed pixel portrait
+    const ASSEMBLY_MS = 2800; // ~2.8s smooth convergence across screen into box
+    const PAUSE_MS = 400;     // ~0.4s pause showing completed pixel portrait in box
     let startTime: number | null = null;
 
     const tick = (now: number) => {
@@ -223,10 +255,10 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
       }
 
       const elapsed = now - startTime;
-      ctx.clearRect(0, 0, S, S);
+      ctx.clearRect(0, 0, W, H);
 
       if (elapsed < ASSEMBLY_MS) {
-        // Phase 1 (0 to 2.8s): Smooth Assembly
+        // Phase 1 (0 to 2.8s): Convergence from full screen into the box
         const pct = Math.min(100, Math.floor((elapsed / ASSEMBLY_MS) * 100));
         setPercent(pct);
         setStatusText(`assembling world… ${pct}%`);
@@ -239,17 +271,17 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
 
           // Smooth cubic ease-out
           const ease = 1 - Math.pow(1 - progress, 3);
-          // Gentle floating wander that settles as it approaches target
-          const wander = (1 - ease) * Math.sin(elapsed * 0.005 + p.wanderAngle) * 6;
+          // Gentle floating wander that diminishes as particle settles into the box
+          const wander = (1 - ease) * Math.sin(elapsed * 0.005 + p.wanderAngle) * 8;
 
           p.x = p.startX + (p.hx - p.startX) * ease + wander;
           p.y = p.startY + (p.hy - p.startY) * ease + wander;
 
           ctx.fillStyle = p.c;
-          ctx.fillRect(p.x - PX / 2, p.y - PX / 2, PX - 1, PX - 1);
+          ctx.fillRect(p.x - pxSize / 2, p.y - pxSize / 2, pxSize - 0.7, pxSize - 0.7);
         }
       } else if (elapsed < ASSEMBLY_MS + PAUSE_MS) {
-        // Phase 2 (2.8s to 3.2s): Fully Assembled Display
+        // Phase 2 (2.8s to 3.2s): Fully Assembled Pixel Portrait in the Box
         setPercent(100);
         setStatusText('assembling world… 100%');
 
@@ -258,19 +290,22 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
           p.x = p.hx;
           p.y = p.hy;
           ctx.fillStyle = p.c;
-          ctx.fillRect(p.x - PX / 2, p.y - PX / 2, PX - 1, PX - 1);
+          ctx.fillRect(p.x - pxSize / 2, p.y - pxSize / 2, pxSize - 0.7, pxSize - 0.7);
         }
       } else {
-        // Phase 3 (3.2s+): Explosion Burst & Smooth Exit Transition
+        // Phase 3 (3.2s+): Full-screen Explosion Burst outward
         if (!exploding) {
           exploding = true;
           setStatusText('entering…');
+          const centerX = W / 2;
+          const centerY = H / 2;
+
           for (let i = 0; i < parts.length; i++) {
             const p = parts[i];
-            const dx = p.x - S / 2;
-            const dy = p.y - S / 2;
+            const dx = p.x - centerX;
+            const dy = p.y - centerY;
             const d = Math.hypot(dx, dy) || 1;
-            const speed = 5 + Math.random() * 9;
+            const speed = 12 + Math.random() * 20; // fast burst across full viewport
             p.vx = (dx / d) * speed;
             p.vy = (dy / d) * speed - 1.5;
           }
@@ -285,9 +320,8 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
           const p = parts[i];
           p.x += p.vx;
           p.y += p.vy;
-          p.vy += 0.12; // gentle downward gravity
           ctx.fillStyle = p.c;
-          ctx.fillRect(p.x - PX / 2, p.y - PX / 2, PX - 1, PX - 1);
+          ctx.fillRect(p.x - pxSize / 2, p.y - pxSize / 2, pxSize - 0.7, pxSize - 0.7);
         }
       }
 
@@ -296,12 +330,13 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
 
     animFrameIdRef.current = requestAnimationFrame(tick);
 
-    // Fail-safe timeout: never hold page hostage
+    // Fail-safe timeout
     const safetyTimer = setTimeout(() => {
       finishIntro(true);
     }, 8000);
 
     return () => {
+      window.removeEventListener('resize', handleResize);
       clearTimeout(safetyTimer);
       if (animFrameIdRef.current) {
         cancelAnimationFrame(animFrameIdRef.current);
@@ -315,41 +350,43 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
     <aside
       aria-label="Portfolio Loading Screen"
       onClick={() => finishIntro(false)}
-      className={`fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center gap-5 md:gap-6 cursor-pointer select-none transition-opacity duration-700 ease-out ${
+      className={`fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center select-none cursor-pointer overflow-hidden transition-opacity duration-700 ease-out ${
         isExiting ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
-      {/* Pixel Portrait Canvas */}
-      <div className="relative flex items-center justify-center">
-        <canvas
-          ref={canvasRef}
-          width={360}
-          height={360}
-          className="w-[280px] h-[280px] sm:w-[320px] sm:h-[320px] md:w-[360px] md:h-[360px] aspect-square block"
-        />
+      {/* Full-Screen Canvas covering entire viewport */}
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 w-full h-full pointer-events-none z-0"
+      />
+
+      {/* Center Target Box: defines the portrait area */}
+      <div
+        ref={boxRef}
+        className="w-[280px] h-[280px] sm:w-[320px] sm:h-[320px] md:w-[350px] md:h-[350px] relative pointer-events-none z-10"
+      />
+
+      {/* Details sitting below the final pixel image box */}
+      <div className="relative z-20 flex flex-col items-center gap-3 mt-6 pointer-events-auto">
+        <h1 className="font-serif-intro italic text-3xl sm:text-4xl text-[#2b2b2b] tracking-wide m-0 font-normal">
+          gokul ramesh
+        </h1>
+
+        <div className="font-mono-intro text-xs sm:text-[13px] text-[#8a8a8a] tracking-[0.14em]">
+          {statusText}
+        </div>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            finishIntro(false);
+          }}
+          className="font-mono-intro text-[11px] text-[#b4b4b4] hover:text-[#555555] transition-colors mt-1 underline underline-offset-4 cursor-pointer bg-transparent border-none p-1"
+        >
+          click to skip
+        </button>
       </div>
-
-      {/* Intro Name */}
-      <h1 className="font-serif-intro italic text-3xl sm:text-4xl text-[#2b2b2b] tracking-wide m-0 font-normal">
-        gokul ramesh
-      </h1>
-
-      {/* Progress Status */}
-      <div className="font-mono-intro text-xs sm:text-[13px] text-[#8a8a8a] tracking-[0.14em]">
-        {statusText}
-      </div>
-
-      {/* Skip Hint */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          finishIntro(false);
-        }}
-        className="font-mono-intro text-[11px] text-[#b4b4b4] hover:text-[#555555] transition-colors mt-1 underline underline-offset-4 cursor-pointer bg-transparent border-none p-1"
-      >
-        click to skip
-      </button>
     </aside>
   );
 }
