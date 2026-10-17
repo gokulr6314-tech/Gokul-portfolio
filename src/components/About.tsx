@@ -6,7 +6,7 @@
 import { motion } from 'motion/react';
 import GlassCard from './GlassCard';
 import { Mail, ShieldCheck, MapPin, ExternalLink, Award, Coffee, Trophy } from 'lucide-react';
-import avatarImg from '../assets/images/Gk.blazer.pic.jpeg';
+import avatarImg from '../assets/images/Gk blazer.jpeg';
 
 export default function About() {
   const stats = [

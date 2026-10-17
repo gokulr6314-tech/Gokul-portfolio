@@ -4,6 +4,7 @@
  */
 
 import BackgroundEffect from './components/BackgroundEffect';
+import PixelLaunchIntro from './components/PixelLaunchIntro';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import About from './components/About';
@@ -16,6 +17,9 @@ import Footer from './components/Footer';
 export default function App() {
   return (
     <div className="relative min-h-screen text-slate-800 antialiased selection:bg-sky-200/50 selection:text-slate-900">
+      {/* Pixelated Portrait Launch Intro Animation */}
+      <PixelLaunchIntro />
+
       {/* Dynamic interactive gradient shift */}
       <BackgroundEffect />
 

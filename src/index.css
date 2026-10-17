@@ -4,6 +4,8 @@
 @theme {
   --font-sans: "Inter", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "DM Sans", "Inter", sans-serif;
+  --font-serif-intro: "Instrument Serif", serif;
+  --font-mono-intro: "Space Mono", monospace;
   
   --shadow-neumorphic: 6px 6px 16px rgba(0,0,0,0.08), -4px -4px 12px rgba(255,255,255,0.9);
   --shadow-neumorphic-hover: 4px 4px 12px rgba(0,0,0,0.06), -3px -3px 10px rgba(255,255,255,0.85);
