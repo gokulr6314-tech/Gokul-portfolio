@@ -22,17 +22,17 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background-color: #f7f7f7;
-      color: #535353;
+      background: linear-gradient(135deg, #F0F2F5 0%, #E2EDF3 50%, #CDE3EE 100%);
+      color: #0284c7;
       font-family: 'Press Start 2P', monospace;
-      transition: background-color 1s ease, color 1s ease;
+      transition: background 1s ease, color 1s ease;
       overflow: hidden;
       padding: 16px;
     }
 
     body.night-mode {
-      background-color: #1a1a1a;
-      color: #e0e0e0;
+      background: #0f172a;
+      color: #e2e8f0;
     }
 
     .game-wrapper {
@@ -501,8 +501,8 @@
         frameCount++;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        const themeColor = isNight ? '#e0e0e0' : '#535353';
-        const mutedColor = isNight ? '#555555' : '#c8c8c8';
+        const themeColor = isNight ? '#e2e8f0' : '#0284c7';
+        const mutedColor = isNight ? '#64748b' : '#94a3b8';
 
         // 1. Environment & Clouds / Stars
         if (isNight) {

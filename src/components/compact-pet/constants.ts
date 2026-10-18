@@ -6,23 +6,32 @@
 import { CompactPetTheme, CompactPetThemeId, CompactPetChar } from './types';
 
 export const COMPACT_PET_THEMES: Record<CompactPetThemeId, CompactPetTheme> = {
-  red: {
-    id: 'red',
-    name: 'Red',
-    primary: '#EF4444',
-    secondary: '#FEE2E2',
-    dark: '#B91C1C',
-    ring: '#7F1D1D',
-    glow: 'rgba(239, 68, 68, 0.25)'
+  sky: {
+    id: 'sky',
+    name: 'Sky (App)',
+    primary: '#0284C7',
+    secondary: '#E0F2FE',
+    dark: '#0369A1',
+    ring: '#0C4A6E',
+    glow: 'rgba(2, 132, 199, 0.25)'
   },
-  pink: {
-    id: 'pink',
-    name: 'Pink',
-    primary: '#EC4899',
-    secondary: '#FCE7F3',
-    dark: '#BE185D',
-    ring: '#831843',
-    glow: 'rgba(236, 72, 153, 0.25)'
+  slate: {
+    id: 'slate',
+    name: 'Slate',
+    primary: '#1E293B',
+    secondary: '#F1F5F9',
+    dark: '#0F172A',
+    ring: '#334155',
+    glow: 'rgba(30, 41, 59, 0.2)'
+  },
+  blue: {
+    id: 'blue',
+    name: 'Blue',
+    primary: '#2563EB',
+    secondary: '#DBEAFE',
+    dark: '#1D4ED8',
+    ring: '#1E3A8A',
+    glow: 'rgba(37, 99, 235, 0.25)'
   },
   purple: {
     id: 'purple',
@@ -33,14 +42,14 @@ export const COMPACT_PET_THEMES: Record<CompactPetThemeId, CompactPetTheme> = {
     ring: '#4C1D95',
     glow: 'rgba(139, 92, 246, 0.25)'
   },
-  blue: {
-    id: 'blue',
-    name: 'Blue',
-    primary: '#3B82F6',
-    secondary: '#DBEAFE',
-    dark: '#1D4ED8',
-    ring: '#1E3A8A',
-    glow: 'rgba(59, 130, 246, 0.25)'
+  pink: {
+    id: 'pink',
+    name: 'Pink',
+    primary: '#EC4899',
+    secondary: '#FCE7F3',
+    dark: '#BE185D',
+    ring: '#831843',
+    glow: 'rgba(236, 72, 153, 0.25)'
   },
   green: {
     id: 'green',
@@ -62,7 +71,7 @@ export const COMPACT_PET_THEMES: Record<CompactPetThemeId, CompactPetTheme> = {
   }
 };
 
-export const COMPACT_THEME_KEYS: CompactPetThemeId[] = ['red', 'pink', 'purple', 'blue', 'green', 'orange'];
+export const COMPACT_THEME_KEYS: CompactPetThemeId[] = ['sky', 'slate', 'blue', 'purple', 'pink', 'green', 'orange'];
 
 export const COMPACT_CHARACTERS: { id: CompactPetChar; label: string }[] = [
   { id: 'blob', label: 'blob' },

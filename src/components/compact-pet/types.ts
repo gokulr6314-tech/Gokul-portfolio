@@ -5,7 +5,7 @@
 
 export type CompactPetChar = 'blob' | 'bunny' | 'ghost' | 'dino';
 
-export type CompactPetThemeId = 'red' | 'pink' | 'purple' | 'blue' | 'green' | 'orange';
+export type CompactPetThemeId = 'sky' | 'slate' | 'blue' | 'purple' | 'pink' | 'green' | 'orange';
 
 export interface CompactPetTheme {
   id: CompactPetThemeId;

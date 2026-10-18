@@ -29,11 +29,15 @@ interface FloatingParticle {
   yOffset: number;
 }
 
+// Dino starting position before starting the game (exactly matches DinoRunnerGame)
+const START_X = 35; // centered over left edge 24 with width 22
+const GROUND_Y = 135; // matches GROUND_Y = 135 in DinoRunnerGame
+
 export default function CompactVirtualPet() {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Persistent States
-  const [themeId, setThemeId] = useState<CompactPetThemeId>('green');
+  // Persistent States - default to application's sky color theme
+  const [themeId, setThemeId] = useState<CompactPetThemeId>('sky');
   const [character, setCharacter] = useState<CompactPetChar>('dino');
   const [growthLevel, setGrowthLevel] = useState<number>(MIN_GROWTH);
   const [isControlOpen, setIsControlOpen] = useState<boolean>(false);
@@ -41,25 +45,28 @@ export default function CompactVirtualPet() {
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
   // Animation & Physics States
-  const [isMoving, setIsMoving] = useState<boolean>(true);
+  const [isMoving, setIsMoving] = useState<boolean>(false); // stationary at starting place
   const [isFed, setIsFed] = useState<boolean>(false);
   const [isDucking, setIsDucking] = useState<boolean>(false);
   const [reactionText, setReactionText] = useState<string | null>(null);
   const [particles, setParticles] = useState<FloatingParticle[]>([]);
 
-  // Local positions inside container
-  const [petPos, setPetPos] = useState<{ x: number; y: number }>({ x: 60, y: 110 });
-  const targetPosRef = useRef<{ x: number; y: number }>({ x: 60, y: 110 });
-  const curPosRef = useRef<{ x: number; y: number }>({ x: 60, y: 110 });
+  // Dino stays in the starting place before game starts
+  const petPos = { x: START_X, y: GROUND_Y };
   const isPointerInsideRef = useRef<boolean>(false);
   const lastFedTimeRef = useRef<number>(0);
-  const animFrameRef = useRef<number | null>(null);
 
   // Restore stored preferences
   useEffect(() => {
     try {
       const savedTheme = localStorage.getItem('portfolio_compact_pet_theme') as CompactPetThemeId;
-      if (savedTheme && COMPACT_PET_THEMES[savedTheme]) setThemeId(savedTheme);
+      // If user had previous default 'green', migrate to application's 'sky' color
+      if (savedTheme && COMPACT_PET_THEMES[savedTheme] && savedTheme !== 'green') {
+        setThemeId(savedTheme);
+      } else {
+        setThemeId('sky');
+        localStorage.setItem('portfolio_compact_pet_theme', 'sky');
+      }
 
       const savedChar = localStorage.getItem('portfolio_compact_pet_char') as CompactPetChar;
       if (savedChar && ['blob', 'bunny', 'ghost', 'dino'].includes(savedChar)) setCharacter(savedChar);
@@ -107,88 +114,10 @@ export default function CompactVirtualPet() {
     } catch {}
   };
 
-  // Confined Physics Loop inside Container (when not playing runner game)
-  useEffect(() => {
-    if (isPlayingGame) return;
-
-    let lastTime = performance.now();
-
-    const loop = (now: number) => {
-      const dt = Math.min(32, now - lastTime);
-      lastTime = now;
-
-      const container = containerRef.current;
-      if (!container) {
-        animFrameRef.current = requestAnimationFrame(loop);
-        return;
-      }
-
-      const rect = container.getBoundingClientRect();
-      const W = rect.width;
-      const H = rect.height;
-
-      // Ground plane Y position (where feet touch the ground track)
-      const groundY = H - 38;
-
-      if (!isPointerInsideRef.current) {
-        // Natural idle walking cycle on the ground plane
-        const idleX = 40 + (Math.sin(now * 0.0018) * 0.5 + 0.5) * (W - 90);
-        targetPosRef.current = { x: idleX, y: groundY };
-      }
-
-      const cur = curPosRef.current;
-      const target = targetPosRef.current;
-
-      const dx = target.x - cur.x;
-      const dy = target.y - cur.y;
-      const dist = Math.hypot(dx, dy);
-
-      if (dist > 1.5) {
-        cur.x += dx * 0.12;
-        cur.y += dy * 0.12;
-
-        // Strict boundary confinement inside sandbox card
-        const minX = 20;
-        const maxX = W - 35;
-        const minY = 30;
-        const maxY = groundY;
-
-        cur.x = Math.max(minX, Math.min(maxX, cur.x));
-        cur.y = Math.max(minY, Math.min(maxY, cur.y));
-
-        setPetPos({ x: cur.x, y: cur.y });
-        setIsMoving(true);
-      } else {
-        setIsMoving(false);
-      }
-
-      animFrameRef.current = requestAnimationFrame(loop);
-    };
-
-    animFrameRef.current = requestAnimationFrame(loop);
-
-    return () => {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
-    };
-  }, [isPlayingGame]);
-
-  // Pointer interactions strictly inside the container
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const container = containerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-
+  // Pointer interactions inside the container
+  const handlePointerMove = () => {
     isPointerInsideRef.current = true;
     setIsHovered(true);
-
-    if (!isPlayingGame) {
-      targetPosRef.current = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      };
-    }
   };
 
   const handlePointerLeave = () => {
@@ -317,14 +246,23 @@ export default function CompactVirtualPet() {
             </svg>
           </div>
 
-          {/* Retro Pixel Ground Track Line */}
-          <div className="absolute bottom-6 left-2 right-2 border-b-2 border-dashed border-slate-300/70 pointer-events-none" />
+          {/* Retro Pixel Ground Track Line (matches GROUND_Y = 135 in DinoRunnerGame) */}
+          <div 
+            className="absolute left-2 right-2 border-b-2 border-dashed border-slate-300/80 pointer-events-none" 
+            style={{ top: '135px' }}
+          />
 
-          {/* Miniature Ground Bump/Pebbles */}
-          <div className="absolute bottom-[23px] left-14 w-2 h-1 bg-slate-300/60 rounded-xs pointer-events-none" />
-          <div className="absolute bottom-[23px] right-20 w-3 h-1 bg-slate-300/60 rounded-xs pointer-events-none" />
+          {/* Miniature Ground Bump/Pebbles aligned to track */}
+          <div 
+            className="absolute left-24 w-2 h-1 bg-slate-300/60 rounded-xs pointer-events-none" 
+            style={{ top: '138px' }}
+          />
+          <div 
+            className="absolute right-16 w-3 h-1 bg-slate-300/60 rounded-xs pointer-events-none" 
+            style={{ top: '138px' }}
+          />
 
-          {/* The Confined Living Pixel Pet */}
+          {/* The Confined Living Pixel Pet (Anchored at starting place before game starts) */}
           <motion.div
             className="absolute cursor-pointer select-none group"
             style={{
@@ -336,12 +274,13 @@ export default function CompactVirtualPet() {
               imageRendering: 'pixelated'
             }}
             animate={{
-              scale: isFed ? [1, 1.18, 0.92, 1] : 1
+              scale: isFed ? [1, 1.15, 0.95, 1] : 1,
+              y: isFed ? [-6, 0] : 0
             }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
+            transition={{ duration: 0.32, ease: 'easeOut' }}
             onClick={handleFeed}
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             title="Click to feed me! Press Space to Play Runner!"
           >
             {/* Render Active Character */}
