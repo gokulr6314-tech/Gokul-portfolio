@@ -80,8 +80,9 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
     };
     window.addEventListener('resize', handleResize);
 
-    const GRID = 44;
-    let pxSize = 7.5;
+    // Higher density grid (96x96) produces small, crisp micro-pixels for clear facial definition
+    const GRID = 96;
+    let pxSize = 3.5;
     let parts: Particle[] | null = null;
     let exploding = false;
 
@@ -183,7 +184,7 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
       }
 
       // Fallback if filtering was too aggressive
-      if (newParts.length < 120) {
+      if (newParts.length < 500) {
         newParts.length = 0;
         for (let y = 0; y < GRID; y++) {
           for (let x = 0; x < GRID; x++) {
@@ -257,6 +258,9 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
       const elapsed = now - startTime;
       ctx.clearRect(0, 0, W, H);
 
+      const drawGap = pxSize > 5 ? 0.7 : Math.max(0.25, pxSize * 0.08);
+      const drawSize = Math.max(1, pxSize - drawGap);
+
       if (elapsed < ASSEMBLY_MS) {
         // Phase 1 (0 to 2.8s): Convergence from full screen into the box
         const pct = Math.min(100, Math.floor((elapsed / ASSEMBLY_MS) * 100));
@@ -278,7 +282,7 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
           p.y = p.startY + (p.hy - p.startY) * ease + wander;
 
           ctx.fillStyle = p.c;
-          ctx.fillRect(p.x - pxSize / 2, p.y - pxSize / 2, pxSize - 0.7, pxSize - 0.7);
+          ctx.fillRect(p.x - pxSize / 2, p.y - pxSize / 2, drawSize, drawSize);
         }
       } else if (elapsed < ASSEMBLY_MS + PAUSE_MS) {
         // Phase 2 (2.8s to 3.2s): Fully Assembled Pixel Portrait in the Box
@@ -290,7 +294,7 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
           p.x = p.hx;
           p.y = p.hy;
           ctx.fillStyle = p.c;
-          ctx.fillRect(p.x - pxSize / 2, p.y - pxSize / 2, pxSize - 0.7, pxSize - 0.7);
+          ctx.fillRect(p.x - pxSize / 2, p.y - pxSize / 2, drawSize, drawSize);
         }
       } else {
         // Phase 3 (3.2s+): Full-screen Explosion Burst outward
@@ -321,7 +325,7 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
           p.x += p.vx;
           p.y += p.vy;
           ctx.fillStyle = p.c;
-          ctx.fillRect(p.x - pxSize / 2, p.y - pxSize / 2, pxSize - 0.7, pxSize - 0.7);
+          ctx.fillRect(p.x - pxSize / 2, p.y - pxSize / 2, drawSize, drawSize);
         }
       }
 
