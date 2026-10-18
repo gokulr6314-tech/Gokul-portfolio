@@ -266,15 +266,12 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
 
     // Timing Configuration:
     // Phase 1 (0 to 2400ms): Flicker & Assemble (0% -> 100%)
-    // Phase 2 (2400ms to 3050ms): Instant Explosive Transition with expo.out momentum
+    // Phase 2 (2400ms to 5400ms): Wait 3 full seconds at 100% showing complete portrait
+    // Phase 3 (5400ms to 6600ms): Silky-smooth Explosive Transition with power3.5 momentum
     const ASSEMBLY_MS = 2400;
-    const EXPLOSION_MS = 650;
+    const HOLD_MS = 3000;
+    const EXPLOSION_MS = 1200;
     let startTime: number | null = null;
-
-    // Inertia-based easing (expo.out) for explosive velocity dissipation
-    const easeExpoOut = (t: number): number => {
-      return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
-    };
 
     const tick = (now: number) => {
       if (isTerminatedRef.current) return;
@@ -301,7 +298,7 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
 
       if (elapsed < ASSEMBLY_MS) {
         // =========================================================================
-        // 1. The Flicker & Assemble Phase
+        // 1. The Flicker & Assemble Phase (0% -> 100%)
         // =========================================================================
         const globalProgress = Math.min(1, elapsed / ASSEMBLY_MS);
         const pct = Math.min(100, Math.floor(globalProgress * 100));
@@ -356,25 +353,41 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
             ctx.fillRect(drawX, drawY, drawSize, drawSize);
           }
         }
+      } else if (elapsed < ASSEMBLY_MS + HOLD_MS) {
+        // =========================================================================
+        // 2. Wait 3 Seconds at 100% (Fully Assembled Stable Portrait)
+        // =========================================================================
+        setPercent(100);
+        setStatusText('assembling world… 100%');
+        ctx.globalAlpha = 1.0;
+
+        for (let i = 0; i < parts.length; i++) {
+          const p = parts[i];
+          p.x = p.hx;
+          p.y = p.hy;
+          ctx.fillStyle = p.c;
+          ctx.fillRect(p.x - pxSize / 2, p.y - pxSize / 2, drawSize, drawSize);
+        }
       } else {
         // =========================================================================
-        // 2. The Explosive Transition Phase (Triggered Exactly at 100%)
+        // 3. Smooth Explosive Transition Phase (Triggered after 3-second hold)
         // =========================================================================
         if (!exploding) {
           exploding = true;
           explosionStartTime = now;
-          setPercent(100);
-          setStatusText('assembling world… 100%');
-          // Trigger immediate seamless dashboard reveal
+          setStatusText('entering…');
+          // Smoothly dissolve overlay background
           setIsExiting(true);
         }
 
         const explosionElapsed = now - (explosionStartTime ?? now);
         const tNorm = Math.min(1, explosionElapsed / EXPLOSION_MS);
-        const ease = easeExpoOut(tNorm);
+        
+        // Silky-smooth momentum burst: energetic initial acceleration with graceful easing
+        const ease = 1 - Math.pow(1 - tNorm, 3.5);
 
-        // Inertia-based momentum burst outward and smooth dissipation
-        const dissolveAlpha = Math.max(0, 1 - Math.pow(tNorm, 1.4));
+        // Smooth dissipation of particle alpha without clipping
+        const dissolveAlpha = Math.max(0, 1 - Math.pow(tNorm, 1.8));
         ctx.globalAlpha = dissolveAlpha;
 
         for (let i = 0; i < parts.length; i++) {
@@ -387,7 +400,7 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
           ctx.fillRect(p.x - pxSize / 2, p.y - pxSize / 2, drawSize, drawSize);
         }
 
-        // Completed explosion: clean finish without lag
+        // Completed explosion: clean finish into main portfolio
         if (tNorm >= 1) {
           finishIntro(true);
           return;
@@ -399,10 +412,10 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
 
     animFrameIdRef.current = requestAnimationFrame(tick);
 
-    // Fail-safe timeout
+    // Fail-safe timeout (calibrated for 2.4s + 3s hold + 1.2s explosion)
     const safetyTimer = setTimeout(() => {
       finishIntro(true);
-    }, 7000);
+    }, 11000);
 
     return () => {
       window.removeEventListener('resize', handleResize);
@@ -419,7 +432,7 @@ export default function PixelLaunchIntro({ onComplete }: PixelLaunchIntroProps) 
     <aside
       aria-label="Portfolio Loading Screen"
       onClick={() => finishIntro(false)}
-      className={`fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center select-none cursor-pointer overflow-hidden transition-opacity duration-500 ease-out ${
+      className={`fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center select-none cursor-pointer overflow-hidden transition-opacity duration-800 ease-out ${
         isExiting ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
