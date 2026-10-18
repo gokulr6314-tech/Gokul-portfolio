@@ -11,6 +11,7 @@ import { ContactSubmission } from '../types';
 import { 
   Send, Mail, Github, Linkedin, Twitter, Sparkles, CheckCircle2, History, AlertCircle, FileText 
 } from 'lucide-react';
+import CompactVirtualPet from './compact-pet/CompactVirtualPet';
 
 export default function Contact() {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
@@ -71,6 +72,11 @@ export default function Contact() {
 
   return (
     <section id="contact" className="py-24 px-4 md:px-8 max-w-6xl mx-auto scroll-mt-12">
+      {/* Miniature Interactive Virtual Pet Companion (confined game sandbox) */}
+      <div className="flex justify-start mb-8">
+        <CompactVirtualPet />
+      </div>
+
       <div className="text-center mb-16">
         <motion.p
           initial={{ opacity: 0, y: 10 }}

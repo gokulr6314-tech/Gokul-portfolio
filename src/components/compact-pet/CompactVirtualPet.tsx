@@ -1,0 +1,369 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Sparkles } from 'lucide-react';
+import { CompactPetChar, CompactPetThemeId, CompactPetTheme } from './types';
+import { 
+  COMPACT_PET_THEMES, 
+  DINO_RUNNING_WIDTH, 
+  DINO_STANDING_HEIGHT, 
+  DINO_DUCKING_WIDTH,
+  MIN_GROWTH, 
+  MAX_GROWTH 
+} from './constants';
+import PixelDino from './PixelDino';
+import PixelBlob from './PixelBlob';
+import PixelBunny from './PixelBunny';
+import PixelGhost from './PixelGhost';
+import CompactPetControl from './CompactPetControl';
+
+interface FloatingParticle {
+  id: string;
+  icon: string;
+  xOffset: number;
+  yOffset: number;
+}
+
+export default function CompactVirtualPet() {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Persistent States
+  const [themeId, setThemeId] = useState<CompactPetThemeId>('green');
+  const [character, setCharacter] = useState<CompactPetChar>('dino');
+  const [growthLevel, setGrowthLevel] = useState<number>(MIN_GROWTH);
+  const [isControlOpen, setIsControlOpen] = useState<boolean>(false);
+
+  // Animation & Physics States
+  const [isMoving, setIsMoving] = useState<boolean>(true);
+  const [isFed, setIsFed] = useState<boolean>(false);
+  const [isDucking, setIsDucking] = useState<boolean>(false);
+  const [reactionText, setReactionText] = useState<string | null>(null);
+  const [particles, setParticles] = useState<FloatingParticle[]>([]);
+
+  // Local positions inside container
+  const [petPos, setPetPos] = useState<{ x: number; y: number }>({ x: 60, y: 110 });
+  const targetPosRef = useRef<{ x: number; y: number }>({ x: 60, y: 110 });
+  const curPosRef = useRef<{ x: number; y: number }>({ x: 60, y: 110 });
+  const isPointerInsideRef = useRef<boolean>(false);
+  const lastFedTimeRef = useRef<number>(0);
+  const animFrameRef = useRef<number | null>(null);
+
+  // Restore stored preferences
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem('portfolio_compact_pet_theme') as CompactPetThemeId;
+      if (savedTheme && COMPACT_PET_THEMES[savedTheme]) setThemeId(savedTheme);
+
+      const savedChar = localStorage.getItem('portfolio_compact_pet_char') as CompactPetChar;
+      if (savedChar && ['blob', 'bunny', 'ghost', 'dino'].includes(savedChar)) setCharacter(savedChar);
+
+      const savedGrowth = parseInt(localStorage.getItem('portfolio_compact_pet_growth') || '', 10);
+      if (!isNaN(savedGrowth) && savedGrowth >= MIN_GROWTH && savedGrowth <= MAX_GROWTH) {
+        setGrowthLevel(savedGrowth);
+      }
+    } catch {}
+  }, []);
+
+  const handleSelectTheme = (id: CompactPetThemeId) => {
+    setThemeId(id);
+    try {
+      localStorage.setItem('portfolio_compact_pet_theme', id);
+    } catch {}
+  };
+
+  const handleSelectCharacter = (char: CompactPetChar) => {
+    setCharacter(char);
+    try {
+      localStorage.setItem('portfolio_compact_pet_char', char);
+    } catch {}
+  };
+
+  const handleResetGrowth = () => {
+    setGrowthLevel(MIN_GROWTH);
+    try {
+      localStorage.setItem('portfolio_compact_pet_growth', MIN_GROWTH.toString());
+    } catch {}
+  };
+
+  // Confined Physics Loop inside Container
+  useEffect(() => {
+    let lastTime = performance.now();
+
+    const loop = (now: number) => {
+      const dt = Math.min(32, now - lastTime);
+      lastTime = now;
+
+      const container = containerRef.current;
+      if (!container) {
+        animFrameRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
+      const rect = container.getBoundingClientRect();
+      const W = rect.width;
+      const H = rect.height;
+
+      // Ground plane Y position (where feet touch the ground track)
+      const groundY = H - 38;
+
+      if (!isPointerInsideRef.current) {
+        // Natural idle walking cycle on the ground plane
+        const idleX = 40 + (Math.sin(now * 0.0018) * 0.5 + 0.5) * (W - 90);
+        targetPosRef.current = { x: idleX, y: groundY };
+      }
+
+      const cur = curPosRef.current;
+      const target = targetPosRef.current;
+
+      const dx = target.x - cur.x;
+      const dy = target.y - cur.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > 1.5) {
+        cur.x += dx * 0.12;
+        cur.y += dy * 0.12;
+
+        // Strict boundary confinement inside sandbox card
+        const minX = 20;
+        const maxX = W - 35;
+        const minY = 30;
+        const maxY = groundY;
+
+        cur.x = Math.max(minX, Math.min(maxX, cur.x));
+        cur.y = Math.max(minY, Math.min(maxY, cur.y));
+
+        setPetPos({ x: cur.x, y: cur.y });
+        setIsMoving(true);
+      } else {
+        setIsMoving(false);
+      }
+
+      animFrameRef.current = requestAnimationFrame(loop);
+    };
+
+    animFrameRef.current = requestAnimationFrame(loop);
+
+    return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+    };
+  }, []);
+
+  // Pointer interactions strictly inside the container
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+
+    isPointerInsideRef.current = true;
+    targetPosRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+  };
+
+  const handlePointerLeave = () => {
+    isPointerInsideRef.current = false;
+  };
+
+  // Feeding & Growth interaction
+  const handleFeed = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+
+    const now = performance.now();
+    if (now - lastFedTimeRef.current < 350) return;
+    lastFedTimeRef.current = now;
+
+    // Increment growth level
+    setGrowthLevel((prev) => {
+      const next = Math.min(MAX_GROWTH, prev + 1);
+      try {
+        localStorage.setItem('portfolio_compact_pet_growth', next.toString());
+      } catch {}
+      return next;
+    });
+
+    setIsFed(true);
+    setIsDucking(true);
+
+    const icons = ['❤️', '✨', '⭐', '🍓'];
+    const randomIcon = icons[Math.floor(Math.random() * icons.length)];
+    const newParticle: FloatingParticle = {
+      id: crypto.randomUUID(),
+      icon: randomIcon,
+      xOffset: (Math.random() - 0.5) * 20,
+      yOffset: -12
+    };
+
+    setParticles(prev => [...prev.slice(-3), newParticle]);
+    setReactionText(growthLevel >= MAX_GROWTH ? 'Max! 👑' : `Lv.${Math.min(MAX_GROWTH, growthLevel + 1)}`);
+
+    setTimeout(() => setIsDucking(false), 380);
+    setTimeout(() => setIsFed(false), 650);
+    setTimeout(() => setReactionText(null), 1100);
+    setTimeout(() => setParticles(prev => prev.filter(p => p.id !== newParticle.id)), 850);
+  }, [growthLevel]);
+
+  const currentTheme: CompactPetTheme = COMPACT_PET_THEMES[themeId] || COMPACT_PET_THEMES.green;
+
+  // Growth scale (1.0 to 1.45)
+  const growthScale = 1 + (growthLevel - 1) * 0.09;
+  const currentWidth = (isDucking ? DINO_DUCKING_WIDTH : DINO_RUNNING_WIDTH) * growthScale;
+  const currentHeight = (isDucking ? 15 : DINO_STANDING_HEIGHT) * growthScale;
+
+  return (
+    <div
+      ref={containerRef}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      className="relative w-[260px] sm:w-[275px] h-[165px] rounded-2xl bg-white/45 backdrop-blur-md border border-white/70 shadow-sm shadow-slate-900/5 p-3 select-none overflow-hidden transition-all duration-300 hover:shadow-md hover:border-white/90"
+      style={{
+        boxShadow: `0 4px 20px -2px ${currentTheme.glow}, 0 2px 8px -2px rgba(0,0,0,0.04)`
+      }}
+    >
+      {/* Top Header Row */}
+      <div className="flex items-center justify-between relative z-10">
+        <div className="flex items-center gap-1.5">
+          <div
+            className="w-2 h-2 rounded-full transition-colors"
+            style={{ backgroundColor: currentTheme.primary }}
+          />
+          <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500/90 font-medium">
+            pixel companion
+          </span>
+        </div>
+
+        {/* Small Settings Toggle Button */}
+        <button
+          type="button"
+          onClick={() => setIsControlOpen(!isControlOpen)}
+          className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all cursor-pointer focus:outline-none"
+          title="Customize pet theme & character"
+          aria-label="Toggle pet customization"
+        >
+          <Sparkles
+            className="w-3.5 h-3.5 transition-transform"
+            style={{ color: currentTheme.primary }}
+          />
+        </button>
+      </div>
+
+      {/* Decorative Drifting Pixel Clouds (matches reference video) */}
+      <div className="absolute top-7 left-4 opacity-35 pointer-events-none animate-[pulse_4s_infinite]">
+        <svg width="28" height="12" viewBox="0 0 28 12" shapeRendering="crispEdges">
+          <rect x="4" y="2" width="16" height="4" fill="#94A3B8" />
+          <rect x="8" y="0" width="8" height="2" fill="#94A3B8" />
+          <rect x="0" y="6" width="24" height="4" fill="#94A3B8" />
+        </svg>
+      </div>
+
+      <div className="absolute top-10 right-8 opacity-25 pointer-events-none">
+        <svg width="22" height="10" viewBox="0 0 22 10" shapeRendering="crispEdges">
+          <rect x="3" y="2" width="12" height="3" fill="#94A3B8" />
+          <rect x="6" y="0" width="6" height="2" fill="#94A3B8" />
+          <rect x="0" y="5" width="18" height="3" fill="#94A3B8" />
+        </svg>
+      </div>
+
+      {/* Retro Pixel Ground Track Line (matches Chrome Dino reference video) */}
+      <div className="absolute bottom-6 left-2 right-2 border-b-2 border-dashed border-slate-300/70 pointer-events-none" />
+
+      {/* Miniature Ground Bump/Pebbles */}
+      <div className="absolute bottom-[23px] left-14 w-2 h-1 bg-slate-300/60 rounded-xs pointer-events-none" />
+      <div className="absolute bottom-[23px] right-20 w-3 h-1 bg-slate-300/60 rounded-xs pointer-events-none" />
+
+      {/* The Confined Living Pixel Pet */}
+      <motion.div
+        className="absolute cursor-pointer select-none group"
+        style={{
+          left: petPos.x,
+          top: petPos.y,
+          width: currentWidth,
+          height: currentHeight,
+          transform: 'translate(-50%, -100%)',
+          imageRendering: 'pixelated'
+        }}
+        animate={{
+          scale: isFed ? [1, 1.18, 0.92, 1] : 1
+        }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+        onClick={handleFeed}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
+        title="Click to feed me!"
+      >
+        {/* Render Active Character */}
+        {character === 'dino' && (
+          <PixelDino theme={currentTheme} isFed={isFed} isMoving={isMoving} isDucking={isDucking} />
+        )}
+        {character === 'blob' && (
+          <PixelBlob theme={currentTheme} isFed={isFed} isMoving={isMoving} isDucking={isDucking} />
+        )}
+        {character === 'bunny' && (
+          <PixelBunny theme={currentTheme} isFed={isFed} isMoving={isMoving} isDucking={isDucking} />
+        )}
+        {character === 'ghost' && (
+          <PixelGhost theme={currentTheme} isFed={isFed} isMoving={isMoving} isDucking={isDucking} />
+        )}
+
+        {/* Reaction Pill Badge */}
+        <AnimatePresence>
+          {reactionText && (
+            <motion.div
+              initial={{ opacity: 0, y: 0, scale: 0.7 }}
+              animate={{ opacity: 1, y: -18, scale: 1 }}
+              exit={{ opacity: 0, y: -26, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+              className="absolute left-1/2 -top-1 -translate-x-1/2 whitespace-nowrap px-1.5 py-0.5 rounded-full text-[8px] font-mono font-bold bg-white text-slate-800 shadow-xs border border-slate-200 pointer-events-none z-20"
+            >
+              {reactionText}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Floating Heart / Sparkle Particles on Feed */}
+        <AnimatePresence>
+          {particles.map((p) => (
+            <motion.div
+              key={p.id}
+              initial={{ opacity: 1, y: 0, x: p.xOffset, scale: 0.7 }}
+              animate={{ opacity: 0, y: -30, x: p.xOffset * 1.4, scale: 1.1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.75, ease: 'easeOut' }}
+              className="absolute top-0 left-1/2 text-[10px] pointer-events-none"
+            >
+              {p.icon}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </motion.div>
+
+      {/* Subtle Hint Instruction at Bottom */}
+      <div className="absolute bottom-1.5 left-3 right-3 flex items-center justify-between text-[9px] font-mono text-slate-400 pointer-events-none">
+        <span>click pet to feed</span>
+        <span className="text-[8px] opacity-75">Lv.{growthLevel}</span>
+      </div>
+
+      {/* Settings Popover (Theme + Character selector) */}
+      <AnimatePresence>
+        {isControlOpen && (
+          <CompactPetControl
+            isOpen={isControlOpen}
+            onClose={() => setIsControlOpen(false)}
+            selectedTheme={currentTheme}
+            onSelectTheme={handleSelectTheme}
+            selectedCharacter={character}
+            onSelectCharacter={handleSelectCharacter}
+            growthLevel={growthLevel}
+            onResetGrowth={handleResetGrowth}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
