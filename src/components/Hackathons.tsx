@@ -102,7 +102,7 @@ export default function Hackathons() {
               <Trophy className="w-6 h-6" />
             </div>
             <div className="font-display font-bold text-3xl md:text-4xl text-slate-900 tracking-tight">
-              6+
+              3+
             </div>
             <div className="text-[11px] font-mono tracking-wider text-slate-600 uppercase mt-1 font-semibold">
               Hackathons Attended
@@ -115,7 +115,7 @@ export default function Hackathons() {
               <Zap className="w-6 h-6" />
             </div>
             <div className="font-display font-bold text-3xl md:text-4xl text-slate-900 tracking-tight">
-              6+
+              3+
             </div>
             <div className="text-[11px] font-mono tracking-wider text-slate-600 uppercase mt-1 font-semibold">
               Prototypes Built

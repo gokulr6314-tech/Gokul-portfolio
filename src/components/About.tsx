@@ -11,7 +11,7 @@ import avatarImg from '../assets/images/Gk blazer.jpeg';
 export default function About() {
   const stats = [
     { label: 'Built Creations', value: '8+', icon: Award },
-    { label: 'Hackathons Attended', value: '6+', icon: Trophy },
+    { label: 'Hackathons Attended', value: '3+', icon: Trophy },
     { label: 'Years of Alchemy', value: '2+', icon: ShieldCheck },
     { label: 'Cups of Roasts', value: '180+', icon: Coffee }
   ];
