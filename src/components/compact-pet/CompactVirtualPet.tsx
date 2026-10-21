@@ -29,9 +29,9 @@ interface FloatingParticle {
   yOffset: number;
 }
 
-// Dino starting position before starting the game (exactly matches DinoRunnerGame)
-const START_X = 35; // centered over left edge 24 with width 22
-const GROUND_Y = 135; // matches GROUND_Y = 135 in DinoRunnerGame
+// Dino starting position before starting the game (matches dinoRef.current.x = 24, GROUND_Y = 135 in DinoRunnerGame)
+const START_X = 24;
+const GROUND_Y = 135;
 
 export default function CompactVirtualPet() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -51,8 +51,6 @@ export default function CompactVirtualPet() {
   const [reactionText, setReactionText] = useState<string | null>(null);
   const [particles, setParticles] = useState<FloatingParticle[]>([]);
 
-  // Dino stays in the starting place before game starts
-  const petPos = { x: START_X, y: GROUND_Y };
   const isPointerInsideRef = useRef<boolean>(false);
   const lastFedTimeRef = useRef<number>(0);
 
@@ -262,15 +260,15 @@ export default function CompactVirtualPet() {
             style={{ top: '138px' }}
           />
 
-          {/* The Confined Living Pixel Pet (Anchored at starting place before game starts) */}
+          {/* The Confined Living Pixel Pet (Anchored on top of ground track line) */}
           <motion.div
             className="absolute cursor-pointer select-none group"
             style={{
-              left: petPos.x,
-              top: petPos.y,
+              left: `${START_X}px`,
+              bottom: `${165 - GROUND_Y}px`,
               width: currentWidth,
               height: currentHeight,
-              transform: 'translate(-50%, -100%)',
+              transformOrigin: 'bottom center',
               imageRendering: 'pixelated'
             }}
             animate={{
