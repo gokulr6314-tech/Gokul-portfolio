@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Contact messaging collection
+    match /messages/{messageId} {
+      // Allow visitors to submit contact messages
+      allow create: if request.resource.data.name is string
+                    && request.resource.data.email is string
+                    && request.resource.data.message is string;
+      
+      // Allow reading messages for transmission history
+      allow read: if true;
+
+      // Disallow modifications and deletions from public clients
+      allow update, delete: if false;
+    }
+  }
+}

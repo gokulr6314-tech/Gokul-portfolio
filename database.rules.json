@@ -1,0 +1,11 @@
+{
+  "rules": {
+    "messages": {
+      ".read": true,
+      ".write": true,
+      "$messageId": {
+        ".validate": "newData.hasChildren(['name', 'email', 'message'])"
+      }
+    }
+  }
+}

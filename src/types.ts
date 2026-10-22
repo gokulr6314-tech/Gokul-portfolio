@@ -28,6 +28,17 @@ export interface ContactSubmission {
   message: string;
   timestamp: string;
   isRead: boolean;
+  source?: 'firebase' | 'local';
+}
+
+export interface FirebaseConfig {
+  apiKey: string;
+  authDomain?: string;
+  projectId: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+  databaseURL?: string;
 }
 
 export interface Hackathon {

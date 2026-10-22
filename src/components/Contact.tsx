@@ -7,21 +7,42 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import GlassCard from './GlassCard';
 import PillButton from './PillButton';
-import { ContactSubmission } from '../types';
+import { ContactSubmission, FirebaseConfig } from '../types';
 import { 
-  Send, Mail, Github, Linkedin, Twitter, Sparkles, CheckCircle2, History, AlertCircle, FileText 
+  Send, Mail, Github, Linkedin, Twitter, Sparkles, CheckCircle2, History, AlertCircle, FileText, Database, Flame, RefreshCw 
 } from 'lucide-react';
 import CompactVirtualPet from './compact-pet/CompactVirtualPet';
+import FirebaseConnectModal from './FirebaseConnectModal';
+import { 
+  getStoredFirebaseConfig, 
+  saveMessageToFirebase, 
+  fetchFirebaseMessages, 
+  getPreferredDatabaseType,
+  DatabaseType
+} from '../services/firebase';
 
 export default function Contact() {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState({ title: '', detail: '' });
   const [showHistory, setShowHistory] = useState(false);
+  
+  // Firebase database state
+  const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState(false);
+  const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
+  const [firebaseDbType, setFirebaseDbType] = useState<DatabaseType>('firestore');
+  const [isSyncingFirebase, setIsSyncingFirebase] = useState(false);
 
-  // Load history on mount
+  // Load history and Firebase status on mount
   useEffect(() => {
+    const config = getStoredFirebaseConfig();
+    if (config) {
+      setIsFirebaseConnected(true);
+      setFirebaseDbType(getPreferredDatabaseType());
+    }
+
     const saved = localStorage.getItem('portfolio_submissions');
     if (saved) {
       try {
@@ -32,35 +53,102 @@ export default function Contact() {
     }
   }, []);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleConnectionChange = (connected: boolean, config: FirebaseConfig | null) => {
+    setIsFirebaseConnected(connected);
+    if (connected) {
+      setFirebaseDbType(getPreferredDatabaseType());
+      // Optionally auto-sync messages from Firebase
+      syncFromFirebase();
+    }
+  };
+
+  const syncFromFirebase = async () => {
+    setIsSyncingFirebase(true);
+    try {
+      const cloudMessages = await fetchFirebaseMessages();
+      if (cloudMessages && cloudMessages.length > 0) {
+        // Merge with existing local submissions
+        setSubmissions(prev => {
+          const map = new Map<string, ContactSubmission>();
+          // Cloud takes precedence
+          cloudMessages.forEach(m => map.set(m.id, m));
+          prev.forEach(m => {
+            if (!map.has(m.id)) map.set(m.id, m);
+          });
+          const merged = Array.from(map.values());
+          localStorage.setItem('portfolio_submissions', JSON.stringify(merged));
+          return merged;
+        });
+      }
+    } catch (e) {
+      console.warn('Firebase sync notice:', e);
+    } finally {
+      setIsSyncingFirebase(false);
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.message) return;
 
     setIsSubmitting(true);
 
-    // Simulate standard smooth delay for premium aesthetics
-    setTimeout(() => {
-      const newSubmission: ContactSubmission = {
-        id: crypto.randomUUID(),
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        message: formData.message.trim(),
-        timestamp: new Date().toLocaleString(),
-        isRead: false
-      };
+    const newSubmission: ContactSubmission = {
+      id: crypto.randomUUID(),
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      message: formData.message.trim(),
+      timestamp: new Date().toLocaleString(),
+      isRead: false,
+      source: isFirebaseConnected ? 'firebase' : 'local'
+    };
 
-      const updated = [newSubmission, ...submissions];
-      setSubmissions(updated);
-      localStorage.setItem('portfolio_submissions', JSON.stringify(updated));
+    let savedToCloud = false;
+    let cloudStorageName = '';
 
-      // Reset form & set successes
-      setFormData({ name: '', email: '', message: '' });
-      setIsSubmitting(false);
-      setSubmitSuccess(true);
-      
-      // Auto dismiss success window
-      setTimeout(() => setSubmitSuccess(false), 5000);
-    }, 1200);
+    // Attempt Firebase Save if configured
+    if (isFirebaseConnected) {
+      try {
+        const result = await saveMessageToFirebase(newSubmission);
+        if (result.success) {
+          savedToCloud = true;
+          cloudStorageName = result.storage === 'firestore' ? 'Cloud Firestore (collection: messages)' : 'Realtime Database (/messages)';
+        }
+      } catch (fbErr) {
+        console.warn('Firebase save fallback to local:', fbErr);
+      }
+    }
+
+    // Always update local storage for immediate responsiveness & backup
+    const sourceMode: 'firebase' | 'local' = savedToCloud ? 'firebase' : 'local';
+    const updated: ContactSubmission[] = [{ ...newSubmission, source: sourceMode }, ...submissions];
+    setSubmissions(updated);
+    localStorage.setItem('portfolio_submissions', JSON.stringify(updated));
+
+    // Reset form & set successes
+    setFormData({ name: '', email: '', message: '' });
+    setIsSubmitting(false);
+
+    if (savedToCloud) {
+      setSuccessMessage({
+        title: 'Transmission Synchronized!',
+        detail: `Message securely stored in your Firebase ${cloudStorageName}.`
+      });
+    } else if (isFirebaseConnected) {
+      setSuccessMessage({
+        title: 'Message Saved Locally',
+        detail: 'Saved to local storage. Please check Firebase connection & database security rules.'
+      });
+    } else {
+      setSuccessMessage({
+        title: 'Message Received Securely!',
+        detail: 'Stored in local application storage. Connect Firebase Database to sync to cloud.'
+      });
+    }
+
+    setSubmitSuccess(true);
+    // Auto dismiss success window
+    setTimeout(() => setSubmitSuccess(false), 5000);
   };
 
   const clearHistory = () => {
@@ -157,7 +245,38 @@ export default function Contact() {
 
         {/* Right column: Form & Submission Log History section */}
         <div className="lg:col-span-7 flex flex-col gap-6">
-          <GlassCard className="shadow-none">
+          <GlassCard className="shadow-none relative">
+            {/* Top Toolbar: Form Label & Firebase Database Connector */}
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200/40 flex-wrap gap-2">
+              <span className="text-[10px] font-mono tracking-widest text-slate-400 uppercase">
+                direct transmission form
+              </span>
+
+              {/* Firebase Database Connection Indicator / Action */}
+              <button
+                type="button"
+                onClick={() => setIsFirebaseModalOpen(true)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-medium transition-all cursor-pointer shadow-xs ${
+                  isFirebaseConnected
+                    ? 'bg-amber-500/10 text-amber-900 border border-amber-500/30 hover:bg-amber-500/20'
+                    : 'bg-white/80 text-slate-600 border border-slate-200 hover:border-slate-300 hover:text-slate-900'
+                }`}
+                title={isFirebaseConnected ? 'Firebase connected. Click to manage configuration.' : 'Connect your Firebase database to store messages in cloud.'}
+              >
+                <Flame className={`w-3.5 h-3.5 ${isFirebaseConnected ? 'fill-amber-500 text-amber-600' : 'text-slate-400'}`} />
+                <span>
+                  {isFirebaseConnected 
+                    ? `Firebase (${firebaseDbType === 'firestore' ? 'Firestore' : 'Realtime'})` 
+                    : 'Connect Firebase'}
+                </span>
+                {isFirebaseConnected ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                ) : (
+                  <span className="text-[9px] text-sky-600 font-semibold underline ml-0.5">Setup</span>
+                )}
+              </button>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Name */}
@@ -232,7 +351,7 @@ export default function Contact() {
                   )}
                 </PillButton>
 
-                 {/* Toggle History Button */}
+                {/* Toggle History Button */}
                 {submissions.length > 0 && (
                   <button
                     type="button"
@@ -262,8 +381,8 @@ export default function Contact() {
               >
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                 <div>
-                  <span className="font-semibold block">Message received securely!</span>
-                  Your transmission was saved to local application storage.
+                  <span className="font-semibold block">{successMessage.title || 'Message received securely!'}</span>
+                  {successMessage.detail || 'Your transmission was saved.'}
                 </div>
               </motion.div>
             )}
@@ -279,24 +398,52 @@ export default function Contact() {
                 className="overflow-hidden"
               >
                 <GlassCard className="py-5 px-6">
-                  <div className="flex items-center justify-between mb-4 border-b border-slate-200/40 pb-3">
+                  <div className="flex items-center justify-between mb-4 border-b border-slate-200/40 pb-3 flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4 text-slate-500" />
                       <span className="text-xs font-mono tracking-wider font-semibold text-slate-700">YOUR TRANSMISSION HISTORY</span>
                     </div>
-                    <button
-                      onClick={clearHistory}
-                      className="text-[10px] font-mono text-red-500 hover:text-red-700 hover:underline cursor-pointer"
-                    >
-                      Purge Logs
-                    </button>
+
+                    <div className="flex items-center gap-2.5">
+                      {isFirebaseConnected && (
+                        <button
+                          type="button"
+                          onClick={syncFromFirebase}
+                          disabled={isSyncingFirebase}
+                          className="flex items-center gap-1 text-[10px] font-mono text-sky-600 hover:text-sky-800 cursor-pointer disabled:opacity-50"
+                          title="Fetch latest messages from Firebase database"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isSyncingFirebase ? 'animate-spin' : ''}`} />
+                          <span>Sync Cloud</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={clearHistory}
+                        className="text-[10px] font-mono text-red-500 hover:text-red-700 hover:underline cursor-pointer"
+                      >
+                        Purge Logs
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="space-y-4 max-h-56 overflow-y-auto pr-1">
-                    {submissions.map((sub, idx) => (
+                  <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
+                    {submissions.map((sub) => (
                       <div key={sub.id} className="p-3.5 bg-white/70 border border-white/85 rounded-xl shadow-[1px_1px_4px_rgba(0,0,0,0.015)]">
                         <div className="flex justify-between items-start mb-1.5 flex-wrap gap-1">
-                          <span className="text-xs font-display font-medium text-slate-800 capitalize">{sub.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-display font-medium text-slate-800 capitalize">{sub.name}</span>
+                            {sub.source === 'firebase' ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-50 text-amber-700 border border-amber-200/60 flex items-center gap-1">
+                                <Flame className="w-2.5 h-2.5 fill-amber-500 text-amber-600" />
+                                Firebase
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-100 text-slate-500 border border-slate-200">
+                                Local
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[9px] font-mono text-slate-400">{sub.timestamp}</span>
                         </div>
                         <p className="text-[10px] font-mono text-slate-500 mb-2 truncate max-w-full" title={sub.email}>{sub.email}</p>
@@ -310,6 +457,13 @@ export default function Contact() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Interactive Firebase Connection Modal */}
+      <FirebaseConnectModal
+        isOpen={isFirebaseModalOpen}
+        onClose={() => setIsFirebaseModalOpen(false)}
+        onConnectionChange={handleConnectionChange}
+      />
     </section>
   );
 }
