@@ -21,12 +21,21 @@ import {
   DatabaseType
 } from '../services/firebase';
 
+export const WHATSAPP_PHONE = '919025941874';
+
+export const WhatsAppIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+  </svg>
+);
+
 export default function Contact() {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState({ title: '', detail: '' });
+  const [lastWhatsAppUrl, setLastWhatsAppUrl] = useState<string>('');
   const [showHistory, setShowHistory] = useState(false);
   
   // Firebase database state
@@ -93,18 +102,21 @@ export default function Contact() {
 
     setIsSubmitting(true);
 
+    const clientName = formData.name.trim();
+    const clientEmail = formData.email.trim();
+    const clientMessage = formData.message.trim();
+
     const newSubmission: ContactSubmission = {
       id: crypto.randomUUID(),
-      name: formData.name.trim(),
-      email: formData.email.trim(),
-      message: formData.message.trim(),
+      name: clientName,
+      email: clientEmail,
+      message: clientMessage,
       timestamp: new Date().toLocaleString(),
       isRead: false,
       source: isFirebaseConnected ? 'firebase' : 'local'
     };
 
     let savedToCloud = false;
-    let cloudStorageName = '';
 
     // Attempt Firebase Save if configured
     if (isFirebaseConnected) {
@@ -112,7 +124,6 @@ export default function Contact() {
         const result = await saveMessageToFirebase(newSubmission);
         if (result.success) {
           savedToCloud = true;
-          cloudStorageName = result.storage === 'firestore' ? 'Cloud Firestore (collection: messages)' : 'Realtime Database (/messages)';
         }
       } catch (fbErr) {
         console.warn('Firebase save fallback to local:', fbErr);
@@ -125,30 +136,41 @@ export default function Contact() {
     setSubmissions(updated);
     localStorage.setItem('portfolio_submissions', JSON.stringify(updated));
 
-    // Reset form & set successes
+    // Construct formatted WhatsApp message URL
+    const whatsappText = 
+      `*New Portfolio Inquiry*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 *Name:* ${clientName}\n` +
+      `📧 *Email:* ${clientEmail}\n` +
+      `💬 *Message:* ${clientMessage}\n` +
+      `🕒 *Time:* ${new Date().toLocaleString()}`;
+
+    const whatsappUrl = `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(whatsappText)}`;
+    setLastWhatsAppUrl(whatsappUrl);
+
+    // Launch WhatsApp
+    try {
+      const win = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        // Fallback for pop-up blockers
+        window.location.href = whatsappUrl;
+      }
+    } catch (err) {
+      console.warn('Could not launch WhatsApp window automatically:', err);
+    }
+
+    // Reset form
     setFormData({ name: '', email: '', message: '' });
     setIsSubmitting(false);
 
-    if (savedToCloud) {
-      setSuccessMessage({
-        title: 'Transmission Synchronized!',
-        detail: `Message securely stored in your Firebase ${cloudStorageName}.`
-      });
-    } else if (isFirebaseConnected) {
-      setSuccessMessage({
-        title: 'Message Saved Locally',
-        detail: 'Saved to local storage. Please check Firebase connection & database security rules.'
-      });
-    } else {
-      setSuccessMessage({
-        title: 'Message Received Securely!',
-        detail: 'Stored in local application storage. Connect Firebase Database to sync to cloud.'
-      });
-    }
+    setSuccessMessage({
+      title: 'Transmitting to WhatsApp!',
+      detail: `Your message has been formatted for WhatsApp (+91 90259 41874) and archived${savedToCloud ? ' to Firebase' : ''}.`
+    });
 
     setSubmitSuccess(true);
     // Auto dismiss success window
-    setTimeout(() => setSubmitSuccess(false), 5000);
+    setTimeout(() => setSubmitSuccess(false), 8000);
   };
 
   const clearHistory = () => {
@@ -195,21 +217,43 @@ export default function Contact() {
               Don’t hesitate to write—I look forward to discussing creative design models, reactive interfaces, or potential consulting roles. Let's design digital spaces that matter.
             </p>
 
-            {/* Structured Quick Mail Link */}
-            <motion.a
-              whileHover={{ scale: 1.02, x: 4 }}
-              whileTap={{ scale: 0.98 }}
-              href="mailto:gokulr6314@gmail.com"
-              className="inline-flex items-center gap-3.5 liquid-glass-card p-4 rounded-[28px] mb-12 group cursor-pointer"
-            >
-              <div className="p-3 liquid-glass-icon-container rounded-2xl text-sky-600 transition-colors">
-                <Mail className="w-4.5 h-4.5" />
-              </div>
-              <div className="text-left">
-                <p className="text-[9px] font-mono tracking-widest text-slate-400 uppercase">directly email</p>
-                <p className="text-sm font-display font-medium text-slate-800">gokulr6314@gmail.com</p>
-              </div>
-            </motion.a>
+            {/* Structured Quick Contact Links: Email & WhatsApp */}
+            <div className="flex flex-col gap-3 mb-10">
+              <motion.a
+                whileHover={{ scale: 1.02, x: 4 }}
+                whileTap={{ scale: 0.98 }}
+                href="mailto:gokulr6314@gmail.com"
+                className="inline-flex items-center gap-3.5 liquid-glass-card p-3.5 rounded-[22px] group cursor-pointer"
+              >
+                <div className="p-2.5 liquid-glass-icon-container rounded-xl text-sky-600 transition-colors">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <p className="text-[9px] font-mono tracking-widest text-slate-400 uppercase">directly email</p>
+                  <p className="text-xs font-display font-medium text-slate-800">gokulr6314@gmail.com</p>
+                </div>
+              </motion.a>
+
+              <motion.a
+                whileHover={{ scale: 1.02, x: 4 }}
+                whileTap={{ scale: 0.98 }}
+                href={`https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent("Hello Gokul! I saw your portfolio and would like to connect.")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3.5 liquid-glass-card p-3.5 rounded-[22px] group cursor-pointer border border-emerald-500/25 hover:border-emerald-500/40"
+              >
+                <div className="p-2.5 liquid-glass-icon-container rounded-xl text-emerald-600 bg-emerald-500/10 transition-colors">
+                  <WhatsAppIcon className="w-4 h-4 fill-emerald-600" />
+                </div>
+                <div className="text-left">
+                  <p className="text-[9px] font-mono tracking-widest text-emerald-700 uppercase flex items-center gap-1.5 font-semibold">
+                    <span>WhatsApp Direct</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  </p>
+                  <p className="text-xs font-display font-medium text-slate-800">+91 90259 41874</p>
+                </div>
+              </motion.a>
+            </div>
           </div>
 
           {/* Social icons row */}
@@ -222,6 +266,7 @@ export default function Contact() {
                 { icon: Twitter, url: 'https://twitter.com', name: 'Twitter' },
                 { icon: Github, url: 'https://github.com/gokulr6314-tech', name: 'GitHub' },
                 { icon: Linkedin, url: 'https://www.linkedin.com/in/gokul-ramesh1?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3BlVqRIPTqRTusB3bhJd184Q%3D%3D', name: 'LinkedIn' },
+                { icon: WhatsAppIcon, url: `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent("Hello Gokul! I saw your portfolio and would like to connect.")}`, name: 'WhatsApp' },
               ].map((channel, i) => {
                 const IconComp = channel.icon;
                 return (
@@ -314,8 +359,8 @@ export default function Contact() {
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Transmit Message</span>
+                      <WhatsAppIcon className="w-4 h-4 fill-emerald-500 text-emerald-500" />
+                      <span>Transmit to WhatsApp</span>
                     </span>
                   )}
                 </PillButton>
@@ -346,12 +391,26 @@ export default function Contact() {
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                className="flex items-center gap-3 p-4 bg-emerald-50/90 border border-emerald-100 rounded-2xl shadow-sm text-emerald-800 text-xs font-sans font-medium"
+                className="flex items-start gap-3 p-4 bg-emerald-50/95 border border-emerald-200/70 rounded-2xl shadow-sm text-emerald-900 text-xs font-sans font-medium"
               >
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <div>
-                  <span className="font-semibold block">{successMessage.title || 'Message received securely!'}</span>
-                  {successMessage.detail || 'Your transmission was saved.'}
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <span className="font-semibold block text-emerald-950 mb-0.5">{successMessage.title || 'Message transmitted!'}</span>
+                  <p className="text-emerald-800 leading-relaxed">{successMessage.detail}</p>
+                  {lastWhatsAppUrl && (
+                    <div className="mt-2.5 flex items-center gap-2">
+                      <a
+                        href={lastWhatsAppUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-[11px] font-mono font-medium transition-colors shadow-xs"
+                      >
+                        <WhatsAppIcon className="w-3.5 h-3.5 fill-white" />
+                        <span>Open WhatsApp Chat</span>
+                      </a>
+                      <span className="text-[10px] font-mono text-emerald-700/80">Delivers to +91 90259 41874</span>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
