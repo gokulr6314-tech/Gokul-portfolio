@@ -245,38 +245,7 @@ export default function Contact() {
 
         {/* Right column: Form & Submission Log History section */}
         <div className="lg:col-span-7 flex flex-col gap-6">
-          <GlassCard className="shadow-none relative">
-            {/* Top Toolbar: Form Label & Firebase Database Connector */}
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200/40 flex-wrap gap-2">
-              <span className="text-[10px] font-mono tracking-widest text-slate-400 uppercase">
-                direct transmission form
-              </span>
-
-              {/* Firebase Database Connection Indicator / Action */}
-              <button
-                type="button"
-                onClick={() => setIsFirebaseModalOpen(true)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-medium transition-all cursor-pointer shadow-xs ${
-                  isFirebaseConnected
-                    ? 'bg-amber-500/10 text-amber-900 border border-amber-500/30 hover:bg-amber-500/20'
-                    : 'bg-white/80 text-slate-600 border border-slate-200 hover:border-slate-300 hover:text-slate-900'
-                }`}
-                title={isFirebaseConnected ? 'Firebase connected. Click to manage configuration.' : 'Connect your Firebase database to store messages in cloud.'}
-              >
-                <Flame className={`w-3.5 h-3.5 ${isFirebaseConnected ? 'fill-amber-500 text-amber-600' : 'text-slate-400'}`} />
-                <span>
-                  {isFirebaseConnected 
-                    ? `Firebase (${firebaseDbType === 'firestore' ? 'Firestore' : 'Realtime'})` 
-                    : 'Connect Firebase'}
-                </span>
-                {isFirebaseConnected ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                ) : (
-                  <span className="text-[9px] text-sky-600 font-semibold underline ml-0.5">Setup</span>
-                )}
-              </button>
-            </div>
-
+          <GlassCard className="shadow-none">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Name */}
